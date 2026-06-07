@@ -8,4 +8,6 @@ public class ItemArma : MonoBehaviour
 
     [HideInInspector] public int filaActual;
     [HideInInspector] public int columnaActual;
+
+    [HideInInspector] public bool estaEnCuadriceula = false;
 }

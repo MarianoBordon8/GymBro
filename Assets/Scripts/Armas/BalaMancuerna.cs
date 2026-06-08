@@ -4,6 +4,7 @@ public class BalaMancuerna : MonoBehaviour
 {
     public float velocidadBala = 8f;
     private Rigidbody2D rb;
+    private bool yaGolpeo = false;
 
     void Start()
     {
@@ -39,18 +40,23 @@ public class BalaMancuerna : MonoBehaviour
     // Esta función de Unity se ejecuta sola cuando el Collider entra en el Trigger del enemigo
     void OnTriggerEnter2D(Collider2D otroObjeto)
     {
-        // Verificamos si el objeto con el que chocamos tiene el script "Enemigo"
+        // Si esta bala ya registró un golpe en este frame, ignoramos cualquier otro choque
+        if (yaGolpeo) return;
+
         Enemigo enemigoGolpeado = otroObjeto.GetComponent<Enemigo>();
 
         if (enemigoGolpeado != null)
         {
-            // Calculamos un daño al azar entre 250 y 400 (usamos 401 porque el máximo en enteros es exclusivo)
-            float danoAleatorio = Random.Range(250, 401);
+            yaGolpeo = true; // Cerramos el cerrojo inmediatamente
 
-            // Le aplicamos el daño al enemigo
+            float danoAleatorio = Random.Range(250, 401);
             enemigoGolpeado.RecibirDano(danoAleatorio);
 
-            // Destruimos la bala amarilla inmediatamente para que no lo atraviese
+            if (GameController.Instancia != null)
+            {
+                GameController.Instancia.FinalizarDisparoJugador();
+            }
+
             Destroy(gameObject);
         }
     }

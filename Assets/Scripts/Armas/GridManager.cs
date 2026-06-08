@@ -2,8 +2,13 @@ using UnityEngine;
 
 public class GridManager : MonoBehaviour
 {
+    [Header("Referencias de la Cuadrícula")]
     public Transform[] casillerosVisuales = new Transform[25];
     private bool[,] matrizOcupacion = new bool[5, 5];
+
+    [Header("Referencias del Jugador")]
+    // Aquí conectaremos el objeto "Arma_Equipada_Visual" que acabamos de crear
+    public GameObject armaEnMano;
 
     private int ObtenerIndiceCasillero(int fila, int columna)
     {
@@ -42,40 +47,46 @@ public class GridManager : MonoBehaviour
                 int indice = ObtenerIndiceCasillero(f, c);
                 posicionCentro += casillerosVisuales[indice].position;
                 celdasOcupadas++;
-
-                // Ocupamos la celda
                 matrizOcupacion[f, c] = true;
             }
         }
 
         posicionCentro /= celdasOcupadas;
-        posicionCentro.z = -2f;
+        posicionCentro.z = -2f; // Mantenemos el arma del inventario en Z = -2 por encima del tablero
 
         arma.transform.position = posicionCentro;
 
-        // El arma ahora recuerda con éxito sus coordenadas actuales
         arma.filaActual = filaInicio;
         arma.columnaActual = columnaInicio;
         arma.estaEnCuadriceula = true;
 
-        Debug.Log($"Arma colocada en Fila {filaInicio}, Columna {columnaInicio}");
+        // REGLA 2: Si acomoda el arma con éxito, el arma de la mano se activa
+        if (armaEnMano != null)
+        {
+            armaEnMano.SetActive(true);
+            Debug.Log("¡Arma visible en la mano del Fisicoculturista!");
+        }
+
         return true;
     }
 
-    // --- NUEVA FUNCIÓN: LIBERAR CASILLEROS ---
     public void LiberarEspacio(ItemArma arma)
     {
-        // Recorremos las celdas que ocupaba el arma según sus coordenadas guardadas
         for (int f = arma.filaActual; f < arma.filaActual + arma.alto; f++)
         {
             for (int c = arma.columnaActual; c < arma.columnaActual + arma.ancho; c++)
             {
-                // Las volvemos a poner en false (vacías)
                 matrizOcupacion[f, c] = false;
             }
         }
 
         arma.estaEnCuadriceula = false;
-        Debug.Log($"Casilleros liberados desde Fila {arma.filaActual}, Columna {arma.columnaActual}");
+
+        // REGLA 3: Si levanta el arma o la saca, el arma de la mano se desactiva
+        if (armaEnMano != null)
+        {
+            armaEnMano.SetActive(false);
+            Debug.Log("Arma de la mano oculta.");
+        }
     }
 }

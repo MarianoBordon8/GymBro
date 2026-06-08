@@ -10,11 +10,17 @@ public class ArrastrarArma : MonoBehaviour
     private GridManager gridManager;
     private ItemArma componenteArma;
 
+    // Nueva referencia para encontrar el control del turno y revisar el botón
+    private ControlTurno controlTurno;
+
     void Start()
     {
         camaraPrincipal = Camera.main;
         gridManager = FindAnyObjectByType<GridManager>();
         componenteArma = GetComponent<ItemArma>();
+
+        // Buscamos el script que maneja el turno en la escena
+        controlTurno = FindAnyObjectByType<ControlTurno>();
 
         posicionInicialFuera = transform.position;
         posicionInicialFuera.z = -2f;
@@ -23,10 +29,20 @@ public class ArrastrarArma : MonoBehaviour
 
     void OnMouseDown()
     {
+        // --- NUEVA REGLA DE BLOQUEO DE TURNO ---
+        // Si ya presionamos Iniciar, el botón se desactivó. 
+        // Si el botón está apagado, bloqueamos por completo el arrastre del arma.
+        if (controlTurno != null && controlTurno.botonIniciarUI != null)
+        {
+            if (!controlTurno.botonIniciarUI.gameObject.activeSelf)
+            {
+                Debug.LogWarning("¡El turno ya inició! Las armas están congeladas en su lugar.");
+                return; // Corta la función acá y no te deja arrastrar nada
+            }
+        }
+
         seEstaArrastrando = true;
 
-        // --- NUEVA LÓGICA DE LIBERACIÓN ---
-        // Si el arma ya estaba en la cuadrícula y la volvemos a agarrar, liberamos sus casilleros viejos
         if (componenteArma != null && componenteArma.estaEnCuadriceula && gridManager != null)
         {
             gridManager.LiberarEspacio(componenteArma);
@@ -41,6 +57,7 @@ public class ArrastrarArma : MonoBehaviour
 
     void OnMouseDrag()
     {
+        // Si la regla de arriba te bloqueó, esto no se ejecutará
         if (!seEstaArrastrando) return;
 
         Vector2 mousePosActual = Mouse.current.position.ReadValue();
@@ -54,6 +71,9 @@ public class ArrastrarArma : MonoBehaviour
 
     void OnMouseUp()
     {
+        // Si no se estaba arrastrando (porque estaba bloqueado), ignoramos el soltar
+        if (!seEstaArrastrando) return;
+
         seEstaArrastrando = false;
 
         if (gridManager == null || componenteArma == null) return;
@@ -87,7 +107,6 @@ public class ArrastrarArma : MonoBehaviour
         {
             bool exito = gridManager.ColocarArma(componenteArma, filaMasCercana, columnaMasCercana);
 
-            // Si no se pudo colocar en el nuevo lugar, regresa a su base fuera del inventario
             if (!exito)
             {
                 RegresarALaBase();
@@ -101,10 +120,7 @@ public class ArrastrarArma : MonoBehaviour
 
     private void RegresarALaBase()
     {
-        Debug.Log("Regresando el arma a su posición base inicial.");
         transform.position = posicionInicialFuera;
-
-        // Nos aseguramos de que el arma sepa que ya no está en la cuadrícula si volvió a la base
         if (componenteArma != null) componenteArma.estaEnCuadriceula = false;
     }
 }

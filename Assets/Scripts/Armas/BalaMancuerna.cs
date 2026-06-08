@@ -2,17 +2,56 @@ using UnityEngine;
 
 public class BalaMancuerna : MonoBehaviour
 {
-    public float velocidadBala = 8f; // Qué tan rápido vuela
+    public float velocidadBala = 8f;
     private Rigidbody2D rb;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
 
-        // Le aplicamos una fuerza hacia la derecha en cuanto aparece
-        rb.linearVelocity = transform.right * velocidadBala;
+        // 1. DIRIGIR LA BALA HACIA EL ENEMIGO
+        // Buscamos al enemigo en la escena usando el script que le acabamos de poner
+        Enemigo objetivoEnemigo = FindAnyObjectByType<Enemigo>();
 
-        // Autodestruimos la bala después de 5 segundos para que no llene la memoria de la computadora si no choca con nada
-        Destroy(gameObject, 5f);
+        if (objetivoEnemigo != null)
+        {
+            // Calculamos el vector de dirección: Restamos (Posición Destino - Posición Origen)
+            Vector3 direccion = objetivoEnemigo.transform.position - transform.position;
+            direccion.Normalize(); // Normalizar hace que el vector mida 1, manteniendo solo la dirección pura
+
+            // Hacemos que la bala rote visualmente para "mirar" al enemigo
+            float anguloZ = Mathf.Atan2(direccion.y, direccion.x) * Mathf.Rad2Deg;
+            transform.rotation = Quaternion.Euler(0, 0, anguloZ);
+
+            // Le aplicamos la velocidad física en esa dirección exacta hacia el objetivo
+            rb.linearVelocity = direccion * velocidadBala;
+        }
+        else
+        {
+            // Si por alguna razón no hay enemigo en el mapa, dispara recto hacia la derecha por defecto
+            rb.linearVelocity = transform.right * velocidadBala;
+        }
+
+        Destroy(gameObject, 5f); // Seguro de vida por si erra
+    }
+
+    // 2. DETECTAR EL IMPACTO Y APLICAR DAÑO ALEATORIO
+    // Esta función de Unity se ejecuta sola cuando el Collider entra en el Trigger del enemigo
+    void OnTriggerEnter2D(Collider2D otroObjeto)
+    {
+        // Verificamos si el objeto con el que chocamos tiene el script "Enemigo"
+        Enemigo enemigoGolpeado = otroObjeto.GetComponent<Enemigo>();
+
+        if (enemigoGolpeado != null)
+        {
+            // Calculamos un daño al azar entre 250 y 400 (usamos 401 porque el máximo en enteros es exclusivo)
+            float danoAleatorio = Random.Range(250, 401);
+
+            // Le aplicamos el daño al enemigo
+            enemigoGolpeado.RecibirDano(danoAleatorio);
+
+            // Destruimos la bala amarilla inmediatamente para que no lo atraviese
+            Destroy(gameObject);
+        }
     }
 }

@@ -9,8 +9,6 @@ public class ArrastrarArma : MonoBehaviour
     private Camera camaraPrincipal;
     private GridManager gridManager;
     private ItemArma componenteArma;
-
-    // Nueva referencia para encontrar el control del turno y revisar el botón
     private ControlTurno controlTurno;
 
     void Start()
@@ -18,65 +16,67 @@ public class ArrastrarArma : MonoBehaviour
         camaraPrincipal = Camera.main;
         gridManager = FindAnyObjectByType<GridManager>();
         componenteArma = GetComponent<ItemArma>();
-
-        // Buscamos el script que maneja el turno en la escena
         controlTurno = FindAnyObjectByType<ControlTurno>();
 
+        // Guardamos la posición exacta del inventario que le pusiste en el editor de Unity
         posicionInicialFuera = transform.position;
-        posicionInicialFuera.z = -2f;
-        transform.position = posicionInicialFuera;
     }
 
     void OnMouseDown()
     {
-        // --- NUEVA REGLA DE BLOQUEO DE TURNO ---
-        // Si ya presionamos Iniciar, el botón se desactivó. 
-        // Si el botón está apagado, bloqueamos por completo el arrastre del arma.
+        // Bloqueo de turno
         if (controlTurno != null && controlTurno.botonIniciarUI != null)
         {
             if (!controlTurno.botonIniciarUI.gameObject.activeSelf)
             {
-                Debug.LogWarning("¡El turno ya inició! Las armas están congeladas en su lugar.");
-                return; // Corta la función acá y no te deja arrastrar nada
+                Debug.LogWarning("¡El turno ya inició! Las armas están congeladas.");
+                return;
             }
         }
 
         seEstaArrastrando = true;
 
+        // Si ya estaba en la cuadrícula, liberamos el espacio para poder moverla
         if (componenteArma != null && componenteArma.estaEnCuadriceula && gridManager != null)
         {
             gridManager.LiberarEspacio(componenteArma);
         }
 
+        // Calculamos la posición del mouse de forma inmediata
         Vector2 mousePosActual = Mouse.current.position.ReadValue();
         Vector3 posicionMouse = camaraPrincipal.ScreenToWorldPoint(mousePosActual);
 
+        // Mantenemos el mismo eje Z actual del objeto para que no se desfase
         desajustePosicion = transform.position - posicionMouse;
         desajustePosicion.z = 0;
     }
 
     void OnMouseDrag()
     {
-        // Si la regla de arriba te bloqueó, esto no se ejecutará
         if (!seEstaArrastrando) return;
 
         Vector2 mousePosActual = Mouse.current.position.ReadValue();
         Vector3 posicionMouse = camaraPrincipal.ScreenToWorldPoint(mousePosActual);
 
         Vector3 nuevaPosicion = posicionMouse + desajustePosicion;
-        nuevaPosicion.z = -2f;
+
+        // Mantenemos el Z original del objeto para evitar que se meta detrás del fondo
+        nuevaPosicion.z = posicionInicialFuera.z;
 
         transform.position = nuevaPosicion;
     }
 
     void OnMouseUp()
     {
-        // Si no se estaba arrastrando (porque estaba bloqueado), ignoramos el soltar
         if (!seEstaArrastrando) return;
 
         seEstaArrastrando = false;
 
-        if (gridManager == null || componenteArma == null) return;
+        if (gridManager == null || componenteArma == null)
+        {
+            RegresarALaBase();
+            return;
+        }
 
         int filaMasCercana = -1;
         int columnaMasCercana = -1;
@@ -105,11 +105,34 @@ public class ArrastrarArma : MonoBehaviour
 
         if (distanciaMinima < 1.5f)
         {
+            // --- NUEVO: VALIDACIÓN DE LA TIENDA ---
+            if (TiendaOleadas.Instancia != null)
+            {
+                // Si la tienda dice que ya compraste, te obliga a regresar a la base de abajo
+                if (!TiendaOleadas.Instancia.IntentarEquiparArmaDeTienda(gameObject))
+                {
+                    RegresarALaBase();
+                    return;
+                }
+            }
+
             bool exito = gridManager.ColocarArma(componenteArma, filaMasCercana, columnaMasCercana);
 
             if (!exito)
             {
                 RegresarALaBase();
+            }
+            else
+            {
+                Vector3 posFijada = transform.position;
+                posFijada.z = posicionInicialFuera.z;
+                transform.position = posFijada;
+
+                // --- NUEVO: NOTIFICAR COMPRA EXITOSA ---
+                if (TiendaOleadas.Instancia != null)
+                {
+                    TiendaOleadas.Instancia.ConfirmarCompraDeArma(gameObject);
+                }
             }
         }
         else

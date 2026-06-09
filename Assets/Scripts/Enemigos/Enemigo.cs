@@ -1,6 +1,5 @@
 using UnityEngine;
 using System.Collections;
-// ¡IMPORTANTE! Agregamos la librería de UI para poder controlar el Slider
 using UnityEngine.UI;
 
 public class Enemigo : MonoBehaviour
@@ -10,22 +9,19 @@ public class Enemigo : MonoBehaviour
     public float vidaActual;
 
     [Header("Referencia de Interfaz")]
-    // Aquí arrastraremos nuestro componente Slider
     public Slider barraVidaUI;
 
     [Header("Movimiento por Turnos Suave")]
     public float distanciaPaso = 0.5f;
     public float velocidadMovimiento = 3f;
     private bool seEstaMoviendo = false;
+    private bool yaMurio = false; // Cerrojo interno del enemigo
 
     void Start()
     {
-        // Elegimos la vida aleatoria
         vidaMax = Random.Range(1000, 1251);
         vidaActual = vidaMax;
 
-        // --- ¡NUEVO! ---
-        // Configuramos los límites del Slider según la vida aleatoria que le tocó a este enemigo
         if (barraVidaUI != null)
         {
             barraVidaUI.maxValue = vidaMax;
@@ -37,10 +33,10 @@ public class Enemigo : MonoBehaviour
 
     public void RecibirDano(float cantidadDano)
     {
+        if (yaMurio) return; // Si ya está muerto, no recibe más daño de balas fantasma
+
         vidaActual -= cantidadDano;
 
-        // --- ¡NUEVO! ---
-        // Actualizamos la barra verde visual en pantalla con la nueva vida restante
         if (barraVidaUI != null)
         {
             barraVidaUI.value = vidaActual;
@@ -56,7 +52,7 @@ public class Enemigo : MonoBehaviour
 
     public void AvanzarUnTramo()
     {
-        if (vidaActual <= 0 || (GameController.Instancia != null && GameController.Instancia.juegoTerminado)) return;
+        if (vidaActual <= 0 || yaMurio || (GameController.Instancia != null && GameController.Instancia.juegoTerminado)) return;
 
         if (!seEstaMoviendo)
         {
@@ -102,8 +98,15 @@ public class Enemigo : MonoBehaviour
 
     private void Morir()
     {
+        yaMurio = true; // Activamos el cerrojo para que no se repita esta función
         Debug.Log("¡El enemigo ha sido destruido!");
-        Destroy(gameObject);
-        if (GameController.Instancia != null) GameController.Instancia.VerificarCondiciones();
+
+        // --- ENVIAR REPORTE OFICIAL AL GAMECONTROLLER ---
+        if (GameController.Instancia != null)
+        {
+            GameController.Instancia.ReportarMuerteEnemigo();
+        }
+
+        Destroy(gameObject); // Ahora sí, Unity lo limpia de la escena de forma segura
     }
 }

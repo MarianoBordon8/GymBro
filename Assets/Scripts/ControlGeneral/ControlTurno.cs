@@ -1,52 +1,146 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
+using System.Collections.Generic;
 
 public class ControlTurno : MonoBehaviour
 {
     [Header("Referencias del Combate")]
-    public GameObject balaPrefab;
     public Transform puntoDisparo;
     public Button botonIniciarUI;
     public ArrastrarArma scriptArrastreArma;
 
-    // Este método lo sigue llamando el BOTÓN una sola vez al principio
+    [Header("Contenedor de Armas Activas")]
+    public Transform contenedorArmas;
+
+    private Queue<ItemArma> colaDeDisparos = new Queue<ItemArma>();
+
     public void PresionarIniciar()
     {
-        // Verificamos si el arma está equipada
-        GameObject armaEnMano = puntoDisparo.GetChild(0).gameObject;
+        ItemArma[] todasLasArmas = FindObjectsByType<ItemArma>();
+        bool mancuernaEstaEquipada = false;
 
-        if (armaEnMano == null || !armaEnMano.activeSelf)
+        foreach (ItemArma arma in todasLasArmas)
         {
-            Debug.LogWarning("¡Coloca el arma en la cuadrícula antes de iniciar!");
+            if (arma.tipoArma == ItemArma.TipoDeArma.Mancuerna && arma.estaEnCuadriceula)
+            {
+                mancuernaEstaEquipada = true;
+                break;
+            }
+        }
+
+        if (!mancuernaEstaEquipada)
+        {
+            Debug.LogWarning("<color=yellow>¡No puedes iniciar! La MANCUERNA debe estar colocada en el tablero.</color>");
             return;
         }
 
-        // Bloqueamos el arma permanentemente por toda la batalla
-        if (scriptArrastreArma != null)
+        ArrastrarArma[] scriptsArrastre = FindObjectsByType<ArrastrarArma>();
+        foreach (ArrastrarArma arrastre in scriptsArrastre)
         {
-            scriptArrastreArma.enabled = false;
+            arrastre.enabled = false;
         }
 
-        // Hacemos desaparecer el botón para siempre en esta partida
-        if (botonIniciarUI != null)
+        if (botonIniciarUI != null) botonIniciarUI.gameObject.SetActive(false);
+
+        if (GameController.Instancia != null)
         {
-            botonIniciarUI.gameObject.SetActive(false);
+            GameController.Instancia.IniciarCombateDeOleada();
         }
 
-        // Lanzamos el primer disparo para arrancar la reacción en cadena
+        CalcularYPlanificarTurno();
+    }
+
+    public void CalcularYPlanificarTurno()
+    {
+        colaDeDisparos.Clear();
+
+        ItemArma[] armasEnEscena = FindObjectsByType<ItemArma>();
+        List<ItemArma> bombasA_Disparar = new List<ItemArma>();
+        List<ItemArma> mancuernasA_Disparar = new List<ItemArma>();
+
+        foreach (ItemArma arma in armasEnEscena)
+        {
+            if (arma.estaEnCuadriceula)
+            {
+                if (contenedorArmas != null)
+                {
+                    arma.transform.SetParent(contenedorArmas);
+                }
+
+                if (arma.tipoArma == ItemArma.TipoDeArma.Bomba)
+                    bombasA_Disparar.Add(arma);
+                else if (arma.tipoArma == ItemArma.TipoDeArma.Mancuerna)
+                    mancuernasA_Disparar.Add(arma);
+            }
+            else
+            {
+                arma.transform.SetParent(null);
+            }
+        }
+
+        foreach (ItemArma bomba in bombasA_Disparar) colaDeDisparos.Enqueue(bomba);
+        foreach (ItemArma mancuerna in mancuernasA_Disparar) colaDeDisparos.Enqueue(mancuerna);
+
         DispararBalaAutomatica();
     }
 
-    // NUEVA FUNCIÓN: Se encarga puramente de clonar la bala
     public void DispararBalaAutomatica()
     {
-        // Si el juego ya terminó por victoria o derrota, no dispara más
         if (GameController.Instancia != null && GameController.Instancia.juegoTerminado) return;
 
-        if (balaPrefab != null && puntoDisparo != null)
+        if (colaDeDisparos.Count > 0)
         {
-            Instantiate(balaPrefab, puntoDisparo.position, puntoDisparo.rotation);
-            Debug.Log("Mancuerna disparada automáticamente.");
+            StartCoroutine(RutinaRafagaEscalonada());
         }
+        else
+        {
+            if (GameController.Instancia != null) GameController.Instancia.FinalizarDisparoJugador();
+        }
+    }
+
+    // --- CORRECCIÓN CRUCIAL: RÁFAGA RÍTMICA CONTROLADA ---
+    IEnumerator RutinaRafagaEscalonada()
+    {
+        while (colaDeDisparos.Count > 0)
+        {
+            if (GameController.Instancia != null && GameController.Instancia.juegoTerminado) yield break;
+
+            if (puntoDisparo != null)
+            {
+                ItemArma armaAtacante = colaDeDisparos.Dequeue();
+
+                if (armaAtacante != null)
+                {
+                    // --- NUEVO: Atrapamos el clon que nos devuelve el ItemArma ---
+                    GameObject balaCreada = armaAtacante.EjecutarDisparo(puntoDisparo);
+
+                    // ESPERA INTELIGENTE 1: Mientras el clon de la bala exista físicamente en la escena,
+                    // el ControlTurno detiene el tiempo y no permite que avance el código.
+                    while (balaCreada != null)
+                    {
+                        yield return null; // Espera al próximo frame y vuelve a chequear
+                    }
+
+                    // ESPERA INTELIGENTE 2: La bala ya chocó y se destruyó. 
+                    // Metemos un respiro obligatorio de medio segundo antes de habilitar el próximo gatillazo.
+                    yield return new WaitForSeconds(0.5f);
+                }
+            }
+        }
+
+        Debug.Log("<color=white>--- Ráfaga finalizada por completo. Ahora sí se moverá el enemigo. ---</color>");
+
+        // REGLA DE ORO: La cola se vació por completo y todas las balas estallaron. 
+        // Le damos el permiso oficial de caminar al enemigo.
+        if (GameController.Instancia != null)
+        {
+            GameController.Instancia.FinalizarDisparoJugador();
+        }
+    }
+
+    public void ResetearFilaDeDisparos()
+    {
+        colaDeDisparos.Clear();
     }
 }

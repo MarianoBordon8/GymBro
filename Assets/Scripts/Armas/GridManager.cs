@@ -6,9 +6,33 @@ public class GridManager : MonoBehaviour
     public Transform[] casillerosVisuales = new Transform[25];
     private bool[,] matrizOcupacion = new bool[5, 5];
 
-    [Header("Referencias del Jugador")]
-    // Aquí conectaremos el objeto "Arma_Equipada_Visual" que acabamos de crear
+    [Header("Arma Principal Obligatoria")]
+    // Arrastrá acá tu mancuerna de la escena para que el tablero la acomode al iniciar
+    public ItemArma mancuernaPrincipal;
+    public int filaInicialMancuerna = 0;    // Fila donde querés que aparezca (0 a 4)
+    public int columnaInicialMancuerna = 0; // Columna donde querés que aparezca (0 a 4)
+
+    [Header("Referencias del Jugador (Opcional)")]
     public GameObject armaEnMano;
+
+    void Start()
+    {
+        // --- NUEVO: AUTO-COLOCACIÓN AL INICIAR EL JUEGO ---
+        if (mancuernaPrincipal != null)
+        {
+            // Forzamos al tablero a colocar la mancuerna en la posición inicial asignada
+            bool colocadoExitoso = ColocarArma(mancuernaPrincipal, filaInicialMancuerna, columnaInicialMancuerna);
+
+            if (colocadoExitoso)
+            {
+                Debug.Log($"<color=green>¡Mancuerna auto-colocada con éxito en la posición [{filaInicialMancuerna},{columnaInicialMancuerna}]!</color>");
+            }
+            else
+            {
+                Debug.LogError("No se pudo auto-colocar la mancuerna. Revisa que las filas/columnas iniciales estén dentro del tablero 5x5.");
+            }
+        }
+    }
 
     private int ObtenerIndiceCasillero(int fila, int columna)
     {
@@ -52,7 +76,7 @@ public class GridManager : MonoBehaviour
         }
 
         posicionCentro /= celdasOcupadas;
-        posicionCentro.z = -2f; // Mantenemos el arma del inventario en Z = -2 por encima del tablero
+        posicionCentro.z = -2f; // Mantenemos el arma en Z = -2 para que se vea sobre el tablero
 
         arma.transform.position = posicionCentro;
 
@@ -60,11 +84,9 @@ public class GridManager : MonoBehaviour
         arma.columnaActual = columnaInicio;
         arma.estaEnCuadriceula = true;
 
-        // REGLA 2: Si acomoda el arma con éxito, el arma de la mano se activa
         if (armaEnMano != null)
         {
             armaEnMano.SetActive(true);
-            Debug.Log("¡Arma visible en la mano del Fisicoculturista!");
         }
 
         return true;
@@ -72,21 +94,17 @@ public class GridManager : MonoBehaviour
 
     public void LiberarEspacio(ItemArma arma)
     {
-        for (int f = arma.filaActual; f < arma.filaActual + arma.alto; f++)
+        if (arma.estaEnCuadriceula)
         {
-            for (int c = arma.columnaActual; c < arma.columnaActual + arma.ancho; c++)
+            for (int f = arma.filaActual; f < arma.filaActual + arma.alto; f++)
             {
-                matrizOcupacion[f, c] = false;
+                for (int c = arma.columnaActual; c < arma.columnaActual + arma.ancho; c++)
+                {
+                    matrizOcupacion[f, c] = false;
+                }
             }
         }
 
         arma.estaEnCuadriceula = false;
-
-        // REGLA 3: Si levanta el arma o la saca, el arma de la mano se desactiva
-        if (armaEnMano != null)
-        {
-            armaEnMano.SetActive(false);
-            Debug.Log("Arma de la mano oculta.");
-        }
     }
 }
